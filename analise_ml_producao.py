@@ -10,18 +10,16 @@ Modelos do trabalho:
 """
 
 from __future__ import annotations
-
 from pathlib import Path
 import os
 import warnings
+
+import matplotlib
 
 ROOT_DIR = Path(__file__).resolve().parent
 OUTPUT_DIR = ROOT_DIR / "resultados_ml"
 OUTPUT_DIR.mkdir(exist_ok=True)
 os.environ.setdefault("MPLCONFIGDIR", str(OUTPUT_DIR / ".matplotlib_cache"))
-
-import matplotlib
-
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
@@ -49,7 +47,7 @@ from sklearn.model_selection import KFold, cross_val_score, train_test_split
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-
+from statsmodels.stats.outliers_influence import variance_inflation_factor
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=ConvergenceWarning)
@@ -98,9 +96,12 @@ def carregar_dados() -> pd.DataFrame:
     if faltantes:
         raise KeyError(f"Colunas ausentes no CSV: {faltantes}")
 
-    df = df[colunas].copy()
     for col in colunas:
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+    df = df.drop_duplicates().reset_index(drop=True)
+
+    df = df[colunas].copy()
 
     if SAMPLE_SIZE is not None and len(df) > SAMPLE_SIZE:
         df = df.sample(SAMPLE_SIZE, random_state=RANDOM_STATE)
@@ -117,8 +118,10 @@ def remover_colunas_constantes(df: pd.DataFrame, features: list[str]) -> list[st
 
 
 def metricas_regressao(y_real, y_previsto) -> dict[str, float]:
+    mse = mean_squared_error(y_real, y_previsto)
     return {
-        "MSE": mean_squared_error(y_real, y_previsto),
+        "MSE": mse,
+        "RMSE": float(np.sqrt(mse)),
         "MAE": mean_absolute_error(y_real, y_previsto),
         "R2": r2_score(y_real, y_previsto),
     }
@@ -130,9 +133,10 @@ def r2_ajustado(r2: float, n_amostras: int, n_features: int) -> float:
 
 def imprimir_metricas_regressao(nome: str, metricas: dict[str, float]) -> None:
     print(f"\n{nome}")
-    print(f"MSE: {metricas['MSE']:.2f}")
-    print(f"MAE: {metricas['MAE']:.2f}")
-    print(f"R2:  {metricas['R2']:.4f}")
+    print(f"MSE:  {metricas['MSE']:.2f}")
+    print(f"RMSE: {metricas['RMSE']:.2f}")
+    print(f"MAE:  {metricas['MAE']:.2f}")
+    print(f"R2:   {metricas['R2']:.4f}")
     if "R2_ajustado" in metricas:
         print(f"R2 ajustado: {metricas['R2_ajustado']:.4f}")
 
@@ -151,7 +155,8 @@ def grafico_real_previsto(y_real, y_previsto, titulo: str, arquivo: str) -> None
 
     plt.figure(figsize=(7, 5))
     sns.scatterplot(data=pontos, x="real", y="previsto", alpha=0.45, s=18)
-    plt.plot([limite_min, limite_max], [limite_min, limite_max], "r--", linewidth=2)
+    plt.plot([limite_min, limite_max], [
+             limite_min, limite_max], "r--", linewidth=2)
     plt.xlabel("Valor real")
     plt.ylabel("Valor previsto")
     plt.title(titulo)
@@ -159,7 +164,8 @@ def grafico_real_previsto(y_real, y_previsto, titulo: str, arquivo: str) -> None
 
 
 def grafico_residuos(y_real, y_previsto, titulo: str, arquivo: str) -> None:
-    pontos = amostra_para_grafico(y_previsto, np.asarray(y_real) - np.asarray(y_previsto))
+    pontos = amostra_para_grafico(
+        y_previsto, np.asarray(y_real) - np.asarray(y_previsto))
     pontos.columns = ["previsto", "residuo"]
 
     plt.figure(figsize=(7, 5))
@@ -199,7 +205,8 @@ def regressao_linear_simples(X_train, X_test, y_train, y_test) -> dict[str, floa
     print(f"Intercepto:  {modelo.intercept_:.6f}")
 
     pontos = pd.DataFrame(
-        {SIMPLE_FEATURE: X_test[SIMPLE_FEATURE], TARGET: y_test, "previsto": y_previsto}
+        {SIMPLE_FEATURE: X_test[SIMPLE_FEATURE],
+            TARGET: y_test, "previsto": y_previsto}
     )
     if len(pontos) > MAX_SCATTER_POINTS:
         pontos = pontos.sample(MAX_SCATTER_POINTS, random_state=RANDOM_STATE)
@@ -230,7 +237,8 @@ def regressao_linear_multipla(X_train, X_test, y_train, y_test) -> dict[str, flo
     modelo.fit(X_train, y_train)
     y_previsto = modelo.predict(X_test)
     metricas = metricas_regressao(y_test, y_previsto)
-    metricas["R2_ajustado"] = r2_ajustado(metricas["R2"], len(y_test), X_test.shape[1])
+    metricas["R2_ajustado"] = r2_ajustado(
+        metricas["R2"], len(y_test), X_test.shape[1])
 
     imprimir_metricas_regressao("3. Regressao Linear Multipla", metricas)
 
@@ -244,9 +252,23 @@ def regressao_linear_multipla(X_train, X_test, y_train, y_test) -> dict[str, flo
             "p_valor": ols.pvalues.values,
         }
     ).sort_values("coeficiente", key=lambda s: s.abs(), ascending=False)
-    coeficientes.to_csv(OUTPUT_DIR / "coeficientes_regressao_multipla.csv", index=False)
+    coeficientes.to_csv(
+        OUTPUT_DIR / "coeficientes_regressao_multipla.csv", index=False)
     print("\nPrincipais coeficientes:")
     print(coeficientes.head(8).to_string(index=False))
+
+    vif_dados = pd.DataFrame(
+        {
+            "feature": X_train_ols.columns,
+            "VIF": [
+                variance_inflation_factor(X_train_ols.values, i)
+                for i in range(X_train_ols.shape[1])
+            ],
+        }
+    ).sort_values("VIF", ascending=False).reset_index(drop=True)
+    vif_dados.to_csv(OUTPUT_DIR / "vif_regressao_multipla.csv", index=False)
+    print("\nFator de Inflacao da Variancia (VIF):")
+    print(vif_dados.to_string(index=False))
 
     grafico_real_previsto(
         y_test,
@@ -359,7 +381,8 @@ def regressao_logistica(df: pd.DataFrame, features: list[str]) -> dict[str, floa
     print(classification_report(y_test, y_previsto, zero_division=0))
 
     cm = confusion_matrix(y_test, y_previsto)
-    disp = ConfusionMatrixDisplay(cm, display_labels=["Nao produziu", "Produziu"])
+    disp = ConfusionMatrixDisplay(
+        cm, display_labels=["Nao produziu", "Produziu"])
     disp.plot(cmap="Blues", values_format="d")
     plt.title("Regressao Logistica - Matriz de Confusao")
     salvar_grafico("logistica_matriz_confusao.png")
@@ -414,9 +437,11 @@ def main() -> None:
     logistica = regressao_logistica(df, features)
 
     resumo_regressao = pd.DataFrame(resultados)
-    resumo_classificacao = pd.DataFrame([{"Modelo": "Regressao Logistica", **logistica}])
+    resumo_classificacao = pd.DataFrame(
+        [{"Modelo": "Regressao Logistica", **logistica}])
 
-    resumo_regressao.to_csv(OUTPUT_DIR / "resumo_modelos_regressao.csv", index=False)
+    resumo_regressao.to_csv(
+        OUTPUT_DIR / "resumo_modelos_regressao.csv", index=False)
     resumo_classificacao.to_csv(
         OUTPUT_DIR / "resumo_modelo_logistico.csv", index=False
     )

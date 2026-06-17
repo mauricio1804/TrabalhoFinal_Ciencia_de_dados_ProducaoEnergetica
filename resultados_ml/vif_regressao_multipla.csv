@@ -1,0 +1,13 @@
+feature,VIF
+const,546199.4019687645
+injecao_gas_mm3,4.342441220508457
+injecao_gas_carbonico_mm3,4.314140643612004
+producao_gas_nao_associado_mm3,2.0414516928270636
+producao_condensado_m3,2.03814383022797
+injecao_nitrogenio_mm3,1.0463232055113914
+ano,1.0275169837306968
+injecao_agua_recuperacao_secundaria_m3,1.0239639889448968
+producao_gas_associado_mm3,1.0197995325118112
+producao_agua_m3,1.0164328093985697
+injecao_agua_descarte_m3,1.0010685288279355
+injecao_polimeros_m3,1.0000215039609741
