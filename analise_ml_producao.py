@@ -10,25 +10,11 @@ Modelos do trabalho:
 """
 
 from __future__ import annotations
-from pathlib import Path
-import os
-import warnings
-
-import matplotlib
-
-ROOT_DIR = Path(__file__).resolve().parent
-OUTPUT_DIR = ROOT_DIR / "resultados_ml"
-OUTPUT_DIR.mkdir(exist_ok=True)
-os.environ.setdefault("MPLCONFIGDIR", str(OUTPUT_DIR / ".matplotlib_cache"))
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import seaborn as sns
-import statsmodels.api as sm
-from sklearn.exceptions import ConvergenceWarning
-from sklearn.linear_model import LinearRegression, LogisticRegression
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.model_selection import KFold, cross_val_score, train_test_split
 from sklearn.metrics import (
     ConfusionMatrixDisplay,
     accuracy_score,
@@ -43,14 +29,26 @@ from sklearn.metrics import (
     roc_auc_score,
     roc_curve,
 )
-from sklearn.model_selection import KFold, cross_val_score, train_test_split
-from sklearn.neighbors import KNeighborsRegressor
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
-from statsmodels.stats.outliers_influence import variance_inflation_factor
+from sklearn.linear_model import LinearRegression, LogisticRegression
+import statsmodels.api as sm
+import seaborn as sns
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib
 
-warnings.filterwarnings("ignore", category=FutureWarning)
-warnings.filterwarnings("ignore", category=ConvergenceWarning)
+from pathlib import Path
+import os
+
+ROOT_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = ROOT_DIR / "resultados_ml"
+OUTPUT_DIR.mkdir(exist_ok=True)
+os.environ.setdefault("MPLCONFIGDIR", str(OUTPUT_DIR / ".matplotlib_cache"))
+
+
+matplotlib.use("Agg")
+
+
 sns.set_theme(style="whitegrid")
 
 DATA_PATH = ROOT_DIR / "producao_maritima_tratada.csv"
