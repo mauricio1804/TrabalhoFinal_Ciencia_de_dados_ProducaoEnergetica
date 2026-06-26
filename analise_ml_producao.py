@@ -10,6 +10,14 @@ Modelos do trabalho:
 """
 
 from __future__ import annotations
+from pathlib import Path
+import os
+
+ROOT_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = ROOT_DIR / "resultados_ml"
+OUTPUT_DIR.mkdir(exist_ok=True)
+os.environ.setdefault("MPLCONFIGDIR", str(OUTPUT_DIR / ".matplotlib_cache"))
+
 from statsmodels.stats.outliers_influence import variance_inflation_factor
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
@@ -34,19 +42,11 @@ import statsmodels.api as sm
 import seaborn as sns
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib
-
-from pathlib import Path
-import os
-
-ROOT_DIR = Path(__file__).resolve().parent
-OUTPUT_DIR = ROOT_DIR / "resultados_ml"
-OUTPUT_DIR.mkdir(exist_ok=True)
-os.environ.setdefault("MPLCONFIGDIR", str(OUTPUT_DIR / ".matplotlib_cache"))
 
 
 matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 
 sns.set_theme(style="whitegrid")
@@ -172,6 +172,39 @@ def grafico_residuos(y_real, y_previsto, titulo: str, arquivo: str) -> None:
     plt.xlabel("Valor previsto")
     plt.ylabel("Residuo")
     plt.title(titulo)
+    salvar_grafico(arquivo)
+
+
+def grafico_residuos_logistica(y_real, y_proba, arquivo: str) -> None:
+    pontos = pd.DataFrame(
+        {
+            "probabilidade_prevista": np.asarray(y_proba),
+            "residuo": np.asarray(y_real) - np.asarray(y_proba),
+            "classe_real": np.asarray(y_real),
+        }
+    )
+    if len(pontos) > MAX_SCATTER_POINTS:
+        pontos = pontos.sample(MAX_SCATTER_POINTS, random_state=RANDOM_STATE)
+
+    pontos["classe_real"] = pontos["classe_real"].map(
+        {0: "Nao produziu", 1: "Produziu"}
+    )
+
+    plt.figure(figsize=(7, 5))
+    sns.scatterplot(
+        data=pontos,
+        x="probabilidade_prevista",
+        y="residuo",
+        hue="classe_real",
+        alpha=0.45,
+        s=18,
+    )
+    plt.axhline(0, color="red", linestyle="--", linewidth=2)
+    plt.axvline(0.5, color="gray", linestyle=":", linewidth=1.5)
+    plt.xlabel("Probabilidade prevista de producao positiva")
+    plt.ylabel("Residuo (classe real - probabilidade prevista)")
+    plt.title("Regressao Logistica - Residuos")
+    plt.legend(title="Classe real")
     salvar_grafico(arquivo)
 
 
@@ -394,6 +427,8 @@ def regressao_logistica(df: pd.DataFrame, features: list[str]) -> dict[str, floa
     plt.title("Regressao Logistica - Curva ROC")
     plt.legend()
     salvar_grafico("logistica_roc.png")
+
+    grafico_residuos_logistica(y_test, y_proba, "logistica_residuos.png")
 
     return metricas
 
